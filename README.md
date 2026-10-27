@@ -44,16 +44,13 @@ Subversion：1.8+（Docker 镜像内置 1.14）
 
 ##### 3.1 适用于：快速部署看效果
 
-*ps:镜像默认托管在docerhub，如果速度不佳，可以选择国内路线（docker pull registry.cn-hangzhou.aliyuncs.com/witersencom/svnadmin:[镜像版本号]）*
-
-> 本仓库 CI 产出的完整 tag 形如 `2.5.11-php83-svn1.14`。下面示例中的 `witersencom/svnadmin:2.5.11` 请替换为你实际发布的镜像地址；如果没有 `2.5.11` 别名，请直接使用完整 tag。
->
-> GitHub Actions 会把镜像推送到 GHCR：`ghcr.io/<仓库所有者>/svnadmin`，包含 `2.5.11`、`2.5.11-php83-svn1.14`、`sha-<短提交>`，默认分支额外推送 `latest`。PR 只构建并执行冒烟测试，不推送镜像。
+*ps:镜像默认托管在github，如果速度不佳，请八仙过海各显神通
 
 此方式可快速部署程序体验效果，数据不存储在宿主机，生产环境使用请看3.2
 
 ```
-docker run -d --name svnadmintemp -p 80:80 -p 3690:3690 --privileged witersencom/svnadmin:2.5.11
+docker pull ghcr.io/weinook/svnadmin:2.5.11 
+docker run -d --name svnadmintemp -p 80:80 -p 3690:3690 --privileged ghcr.io/weinook/svnadmin:2.5.11
 ```
 
 ##### 3.2 适用于：新用户正式使用
@@ -61,7 +58,7 @@ docker run -d --name svnadmintemp -p 80:80 -p 3690:3690 --privileged witersencom
 - 创建一个临时的容器（无需启动）用于复制配置文件出来
 
 ```
-docker create --name svnadmintemp witersencom/svnadmin:2.5.11
+docker create --name svnadmintemp ghcr.io/weinook/svnadmin:2.5.11
 ```
 
 - 把配置文件复制到本机的 `/home/svnadmin` 目录
@@ -88,7 +85,7 @@ docker run -d -p 80:80 -p 3690:3690 \
 -v /home/svnadmin/sasl2/:/etc/sasl2/ \
 --privileged \
 --name svnadmin \
-witersencom/svnadmin:2.5.11
+ghcr.io/weinook/svnadmin:2.5.11
 ```
 
 - 进入容器内进行文件授权
@@ -109,195 +106,9 @@ chown -R apache:apache /home/svnadmin
   - 源码部署：先在 Rocky/RHEL 9（或 Ubuntu）安装 PHP >= 8.3.36 与 php-fpm，替换代码后执行 `php server/install.php`，再重启 `svnadmind` 与 Apache/php-fpm
   - 升级后可执行只读冒烟测试：`bash 03.cicd/smoke_test.sh <容器名> http://127.0.0.1:<端口> admin admin`
 
-### 4. 源码安装
+### 4. 源码安装(没测过，建议docker安装）
 
-svnadmin = web系统 + 后台进程，因此安装注意噢
 
-##### 4.1 适用于：Rocky Linux 9 / RHEL 9
-
-- 安装解压缩等工具
-
-```
-dnf install -y zip unzip wget vim which
-```
-
-- 安装sasl相关依赖（svn协议检出配置sasl认证如ldap要用到）
-
-```
-dnf install -y cyrus-sasl cyrus-sasl-lib cyrus-sasl-plain
-```
-
-- 安装PHP和相关扩展（要求 PHP >= 8.3.36，使用 remi 的 php:remi-8.3 模块）
-
-```
-dnf install -y epel-release dnf-plugins-core
-rpm -Uvh https://rpms.remirepo.net/enterprise/remi-release-9.rpm
-dnf module reset php || true
-dnf module enable php:remi-8.3
-
-dnf install -y php-cli php-common php-fpm php-mysqlnd php-pdo php-process php-gd php-bcmath php-ldap php-mbstring php-opcache
-```
-
-- 安装web服务器（推荐 apache 可使用http协议检出；php-fpm 包会自动写入 Apache 的 php.conf）
-
-```
-dnf install -y httpd mod_dav_svn mod_ldap
-systemctl start httpd
-systemctl enable httpd
-systemctl start php-fpm
-systemctl enable php-fpm
-```
-
-- 安装任务计划组件（任务计划功能用到）
-
-```
-dnf install -y cronie at
-
-#启动atd（如果 ps aux | grep -v 'grep' | grep atd 的结果为空需要执行）
-atd
-
-#启动crond（如果 ps aux | grep -v 'grep' | grep crond 的结果为空需要执行）
-crond
-```
-
-- 下载解压代码包
-
-```
-# 注意：请将下面的地址替换为你自己仓库的 2.5.11 发布包地址
-cd /var/www/html/ && wget https://gitee.com/witersen/SvnAdminV2.0/releases/download/2.5.11/2.5.11.zip
-
-unzip 2.5.11.zip
-```
-
-- 安装Subversion（如果你安装过Subversion，本步骤可以略过）（注意需要Subversion >= 1.8）
-
-```
-cd /var/www/html/server/
-chown -R apache:apache /var/www/html/
-#选项1
-php install.php
-```
-
-- 修改Subversion的配置使其支持被本系统管理（如果你安装过Subversion，本步骤要执行）
-
-```
-cd /var/www/html/server
-#选项1或选项2
-php install.php
-```
-
-- 为数据目录授权属主和属组。php脚本web调用是以apache身份执行，因此apache用户需要对数据目录有权
-- 如果你使用其它web服务器如nginx tomcat 可以通过浏览器访问 你的机器IP/server/own.php 来获取属主和属组
-
-```
-chown -R apache:apache /home/svnadmin
-```
-
-- 手动启动后台进程（启动方式一）
-
-  ```
-  #pwd
-  #/var/www/html/server/
-  
-  #后台运行
-  nohup php svnadmind.php start >/dev/null 2>&1 &
-  #后台运行后输入exit退出一下 保证后台稳定运行
-  exit
-  
-  #停止后台
-  php svnadmind.php stop
-  
-  #调试模式
-  php svnadmind.php console
-  ```
-
-- 通过系统管理启动后台进程（启动方式二）
-
-  - 新建系统服务文件 svnserve.service（centos一般为 /usr/lib/systemd/system/svnadmind.service、ubuntu 一般为 /lib/systemd/system/svnadmind.service）
-    - 写入以下内容（注意根据自己的代码部署路径调整）
-
-  ```
-  [Unit]
-  Description=SVNAdmin
-  After=syslog.target network.target
-  
-  [Service]
-  Type=simple
-  ExecStart=/usr/bin/php /var/www/html/server/svnadmind.php start
-  
-  [Install]
-  WantedBy=multi-user.target
-  ```
-
-    - 操作服务
-
-  ```
-  #启动
-  systemctl daemon-reload
-  systemctl start svnadmind
-  
-  #查看状态
-  systemctl status svnadmind
-  
-  #加入开机自启动
-  systemctl enable svnadmind
-  ```
-
-##### 4.2 适用于：宝塔面板
-
-- 安装方式跟手动部署类似，只是宝塔系统了很多可视化操作很方便
-
-- 参考视频：[SVNAdmin V2.2.1 系统部署与使用演示视频【针对宝塔面板】]( https://www.bilibili.com/video/BV1XR4y1H7p3?share_source=copy_web&vd_source=f4620db503611c42618f1afd9c8afecd) 
-
-##### 4.3 适用于：Ubuntu 22.04 / 24.04
-
-- 步骤同1（注意需要以root用户执行 server/install.php 和 server/svnadmind.php ）
-- 在ubuntu中软件包名称多与RHEL系列不同，需要用户自行处理
-- 要求 PHP >= 8.3.36，下面使用 ondrej/php PPA
-
-```
-sudo apt-get update
-
-sudo apt-get install -y software-properties-common
-sudo add-apt-repository -y ppa:ondrej/php
-sudo apt-get update
-
-sudo apt-get install -y apache2
-sudo apt-get install -y php8.3-cli php8.3-fpm php8.3-mysql php8.3-sqlite3 php8.3-gd php8.3-ldap php8.3-mbstring php8.3-bcmath php8.3-opcache
-
-sudo a2enmod proxy_fcgi setenvif
-sudo a2enconf php8.3-fpm
-sudo systemctl restart apache2
-sudo systemctl enable php8.3-fpm
-sudo systemctl start php8.3-fpm
-
-sudo apt-get install -y sqlite3
-
-sudo apt-get install -y subversion subversion-tools
-
-cd /var/www/html
-
-wget xxx.zip
-
-unzip xxx.zip
-
-#选项2
-sudo server/install.php
-
-chown -R apache:apache /home/svnadmin/
-
-su root
-
-nohup php server/svnadmind.php start &
-```
-
-##### 4.4 适用于：旧用户升级
-
-- 2.3.x和2.4.x和2.5.x升级到2.5.11
-  - 先按 4.1 把 PHP 升级到 **>= 8.3.36**（EL7 的 remi-php83 停在 8.3.8，必须迁移到 Rocky/RHEL 9 或 Ubuntu）
-  - dnf install -y unzip
-  - 替换代码后执行 `cd /var/www/html/server && php install.php`
-  - 重启 `svnadmind` 与 Apache/php-fpm
 
 ### 5. 常见问题解答
 
