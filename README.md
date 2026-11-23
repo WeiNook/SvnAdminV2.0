@@ -298,6 +298,9 @@ nohup php server/svnadmind.php start &
   - dnf install -y unzip
   - 替换代码后执行 `cd /var/www/html/server && php install.php`
   - 重启 `svnadmind` 与 Apache/php-fpm
+  - Docker 部署必须拉取 2.5.11 新镜像并重建容器，只 restart 旧容器不会生效（旧镜像是 CentOS 7 + mod_php）
+  - 升级后检查 `/etc/httpd/conf.d/subversion.conf` 顶层是否有 `SVNUseUTF8 On`，没有的话中文仓库名无法通过 HTTP 检出（见 5.17）
+  - Docker 部署如果沿用 `-v /data/svnadmin/conf.d/:/etc/httpd/conf.d/` 整目录挂载，需要把镜像内的 php-fpm 转发配置补进该目录，否则接口会直接返回 PHP 源码（见 5.16）
 
 ### 5. 常见问题解答
 
@@ -368,7 +371,14 @@ select * from admin_users;
 
 ##### 5.8 关于大文件下载中断问题
 
-- 当下载1G以及以上的大文件会出现下载被中断的问题，是因为文件下载为了安全没有使用http文件直链，而是通过php校验后读取文件流下载，所以会存在一个php-fpm最大执行时间的问题，因此你可以通过 设置 php-fpm.conf 配置文件的 request_terminate_timeout 为0 来取消超时限制
+- 当下载1G以及以上的大文件会出现下载被中断的问题，是因为文件下载为了安全没有使用http文件直链，而是通过php校验后读取文件流下载，所以会存在一个php-fpm最大执行时间的问题
+- 解决方式是取消 php-fpm 的超时限制，把 `request_terminate_timeout` 设置为 0（该参数是 pool 级配置，位置随发行版不同）
+  - Rocky/RHEL 9（remi）：`/etc/php-fpm.d/www.conf` 的 `[www]` 段
+  - Ubuntu（ondrej PPA）：`/etc/php/8.3/fpm/pool.d/www.conf` 的 `[www]` 段
+  - 修改后执行 `systemctl restart php-fpm`（Ubuntu 为 `php8.3-fpm`）
+- 2.5.11 的 Docker 镜像已内置 `request_terminate_timeout = 0`，使用官方镜像无需处理；如果自行挂载了 `www.conf`，需要自己补上该项
+- 不需要修改 php.ini 的 `max_execution_time`：下载代码里已经调用 `set_time_limit(0)`，且该参数在 Linux 下只累计 CPU 时间，不包含阻塞 IO
+- 如果前面还有 nginx 反向代理，需要同时放宽 `proxy_read_timeout` / `fastcgi_read_timeout`
 
 ##### 5.9 如果配置了多个仓库模板，如何在创建仓库时指定使用某个仓库模板？
 
@@ -440,4 +450,59 @@ setsebool -P httpd_can_connect_ldap=1
 ```
 参考文章：https://www.witersen.com/?p=1844
 其中关于如何对接LDAP作了详细解释
+```
+
+##### 5.16 登录页正常但接口返回 PHP 源码（Docker 整目录挂载 conf.d）
+
+```
+【现象】
+页面能正常打开，但所有接口（例如 api.php?c=Setting&a=GetVerifyOption&t=web）返回的是 api.php 的源码，登录失败且没有任何错误信息
+
+【原因】
+2.5.11 起 PHP 由 mod_php 改为 php-fpm + mod_proxy_fcgi，.php 的转发配置由镜像内的 /etc/httpd/conf.d/php.conf 提供
+如果启动容器时使用 -v /data/svnadmin/conf.d/:/etc/httpd/conf.d/ 整目录挂载，镜像内的 php.conf 会被宿主机目录覆盖
+Apache 找不到 .php 的处理程序，于是把 PHP 源码当作静态文件返回
+
+【解决方案】
+方案1：只挂载需要保留的配置文件，保留镜像内其余配置
+  -v /data/svnadmin/conf.d/subversion.conf:/etc/httpd/conf.d/subversion.conf
+方案2：把镜像内的 php.conf 补到宿主机目录，并删除旧版 mod_php 残留的配置
+  docker create --name tmpconf <镜像名>
+  docker cp tmpconf:/etc/httpd/conf.d/php.conf /data/svnadmin/conf.d/php.conf
+  docker rm tmpconf
+  然后重启容器
+
+【验证】
+docker exec <容器名> grep -n 'proxy:unix' /etc/httpd/conf.d/php.conf
+curl -s 'http://<地址>/api.php?c=Setting&a=GetVerifyOption&t=web'
+```
+
+##### 5.17 HTTP 检出中文仓库名报错 Could not open the requested SVN filesystem
+
+```
+【现象】
+网页端一切正常，但 SVN 客户端对中文仓库名的仓库执行检出/更新时报：
+Unable to connect to a repository at URL '...'
+Could not open the requested SVN filesystem
+容器内 /var/log/httpd/error_log 中可以看到：
+Can't convert string from 'UTF-8' to native encoding: /home/svnadmin/rep/...
+
+【原因】
+httpd 进程默认运行在 C/POSIX（7-bit ASCII）locale 下，而 Subversion 内部使用 UTF-8
+mod_dav_svn 打开仓库时需要把 UTF-8 路径转换为本地字符集，遇到中文仓库名转换失败，返回 500
+这是上游的已知问题（SVN-2487），与仓库数据、目录权限无关，权限正常时 svnlook youngest 可以打开仓库
+
+【解决方案】
+在 subversion.conf 中增加 SVNUseUTF8 On（需要 Subversion >= 1.8）
+注意该指令属于 server config / virtual host 上下文，必须写在 <Location> 块外，否则 httpd -t 会报：
+SVNUseUTF8 not allowed in <Location> context
+正确写法：
+SVNUseUTF8 On
+
+<Location /svn>
+  DAV svn
+  ...
+</Location>
+修改后先执行 httpd -t 校验，再执行 httpd -k graceful 平滑重载
+2.5.11 起的 Apache 模板已自带该指令；旧配置可以在系统里切换一次「HTTP 检出」重新生成 subversion.conf
 ```
