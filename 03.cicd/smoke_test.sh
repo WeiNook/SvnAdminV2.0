@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 #
-# SVNAdmin2 2.5.11 冒烟测试
+# SVNAdmin2 2.5.12 冒烟测试
 #
 # 用法：
 #   bash 03.cicd/smoke_test.sh [容器名] [访问地址] [管理员账号] [管理员密码]

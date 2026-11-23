@@ -53,7 +53,7 @@ The daemon refuses to start on non-Linux systems or when `pcntl_*` / `shell_exec
 - Image build: `03.cicd/svnadmin_docker/dockerfile` (Rocky Linux 9 + REMI PHP 8.3 + php-fpm + Apache/SVN; frontend built in a separate `node:14.21.3-bullseye` stage and copied into `/var/www/html`). `start.sh` starts php-fpm, svnserve, saslauthd, crond, atd, and `svnadmind`, then runs Apache in the foreground.
 - CI: `03.cicd/Jenkinsfile` builds on commit messages containing `[ci]` (also `Merge*`); `[test]` triggers Sonar. `03.cicd/local_build.sh` builds the image and a source archive.
 - Read-only smoke test for a running container: `bash 03.cicd/smoke_test.sh <container> http://127.0.0.1:<port> admin admin` (login/captcha, list and settings endpoints, PHP error log check).
-- The release version is hardcoded in several places: `02.php/config/version.php`, the `TAG` in `03.cicd/Jenkinsfile`, `01.web/src/views/login/index.vue`, and `01.web/src/views/setting/index.vue`. Bump them together (currently 2.5.11).
+- The release version is hardcoded in several places: `02.php/config/version.php`, the `TAG` in `03.cicd/Jenkinsfile`, `01.web/src/views/login/index.vue`, and `01.web/src/views/setting/index.vue`. Bump them together (currently 2.5.12).
 
 ## Architecture
 

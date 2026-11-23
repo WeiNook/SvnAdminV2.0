@@ -46,14 +46,14 @@ Subversion：1.8+（Docker 镜像内置 1.14）
 
 *ps:镜像默认托管在docerhub，如果速度不佳，可以选择国内路线（docker pull registry.cn-hangzhou.aliyuncs.com/witersencom/svnadmin:[镜像版本号]）*
 
-> 本仓库 CI 产出的完整 tag 形如 `2.5.11-php83-svn1.14`。下面示例中的 `witersencom/svnadmin:2.5.11` 请替换为你实际发布的镜像地址；如果没有 `2.5.11` 别名，请直接使用完整 tag。
+> 本仓库 CI 产出的完整 tag 形如 `2.5.12-php83-svn1.14`。下面示例中的 `witersencom/svnadmin:2.5.12` 请替换为你实际发布的镜像地址；如果没有 `2.5.12` 别名，请直接使用完整 tag。
 >
-> GitHub Actions 会把镜像推送到 GHCR：`ghcr.io/<仓库所有者>/svnadmin`，包含 `2.5.11`、`2.5.11-php83-svn1.14`、`sha-<短提交>`，默认分支额外推送 `latest`。PR 只构建并执行冒烟测试，不推送镜像。
+> GitHub Actions 会把镜像推送到 GHCR：`ghcr.io/<仓库所有者>/svnadmin`，包含 `2.5.12`、`2.5.12-php83-svn1.14`、`sha-<短提交>`，默认分支额外推送 `latest`。PR 只构建并执行冒烟测试，不推送镜像。
 
 此方式可快速部署程序体验效果，数据不存储在宿主机，生产环境使用请看3.2
 
 ```
-docker run -d --name svnadmintemp -p 80:80 -p 3690:3690 --privileged witersencom/svnadmin:2.5.11
+docker run -d --name svnadmintemp -p 80:80 -p 3690:3690 --privileged witersencom/svnadmin:2.5.12
 ```
 
 ##### 3.2 适用于：新用户正式使用
@@ -61,7 +61,7 @@ docker run -d --name svnadmintemp -p 80:80 -p 3690:3690 --privileged witersencom
 - 创建一个临时的容器（无需启动）用于复制配置文件出来
 
 ```
-docker create --name svnadmintemp witersencom/svnadmin:2.5.11
+docker create --name svnadmintemp witersencom/svnadmin:2.5.12
 ```
 
 - 把配置文件复制到本机的 `/home/svnadmin` 目录
@@ -88,7 +88,7 @@ docker run -d -p 80:80 -p 3690:3690 \
 -v /home/svnadmin/sasl2/:/etc/sasl2/ \
 --privileged \
 --name svnadmin \
-witersencom/svnadmin:2.5.11
+witersencom/svnadmin:2.5.12
 ```
 
 - 进入容器内进行文件授权
@@ -102,12 +102,15 @@ chown -R apache:apache /home/svnadmin
 
 *ps: 2.4.3 及之前的用户要注意目录挂载多了 conf.d sasl2 升级之前要提前复制出来*
 
-- 2.5.10 及更早版本升级到 2.5.11
-  - 本次升级包含 **PHP 运行时升级（>= 8.3.36）**，必须使用 2.5.11 的新镜像或完整源码包，不能只在旧容器内执行 update
+- 2.5.10 及更早版本升级到 2.5.12
+  - 本次升级包含 **PHP 运行时升级（>= 8.3.36）**，必须使用 2.5.12 的新镜像或完整源码包，不能只在旧容器内执行 update
   - 升级前备份 `/home/svnadmin`、`/etc/httpd/conf.d`、`/etc/sasl2`
-  - 停止旧容器，拉取 2.5.11 镜像，挂载原数据目录启动；启动后进入容器确认 `php -v` >= 8.3.36
+  - 停止旧容器，拉取 2.5.12 镜像，挂载原数据目录启动；启动后进入容器确认 `php -v` >= 8.3.36
   - 源码部署：先在 Rocky/RHEL 9（或 Ubuntu）安装 PHP >= 8.3.36 与 php-fpm，替换代码后执行 `php server/install.php`，再重启 `svnadmind` 与 Apache/php-fpm
   - 升级后可执行只读冒烟测试：`bash 03.cicd/smoke_test.sh <容器名> http://127.0.0.1:<端口> admin admin`
+- 2.5.11 升级到 2.5.12
+  - 重建容器后检查 `subversion.conf` 顶层是否有 `SVNUseUTF8 On`，没有的话中文仓库名无法通过 HTTP 检出（见 5.17）
+  - 如果沿用 `-v /data/svnadmin/conf.d/:/etc/httpd/conf.d/` 整目录挂载，需要把镜像内的 php-fpm 转发配置补进该目录，否则接口会直接返回 PHP 源码（见 5.16）
 
 ### 4. 源码安装
 
@@ -163,10 +166,10 @@ crond
 - 下载解压代码包
 
 ```
-# 注意：请将下面的地址替换为你自己仓库的 2.5.11 发布包地址
-cd /var/www/html/ && wget https://gitee.com/witersen/SvnAdminV2.0/releases/download/2.5.11/2.5.11.zip
+# 注意：请将下面的地址替换为你自己仓库的 2.5.12 发布包地址
+cd /var/www/html/ && wget https://gitee.com/witersen/SvnAdminV2.0/releases/download/2.5.12/2.5.12.zip
 
-unzip 2.5.11.zip
+unzip 2.5.12.zip
 ```
 
 - 安装Subversion（如果你安装过Subversion，本步骤可以略过）（注意需要Subversion >= 1.8）
@@ -293,12 +296,12 @@ nohup php server/svnadmind.php start &
 
 ##### 4.4 适用于：旧用户升级
 
-- 2.3.x和2.4.x和2.5.x升级到2.5.11
+- 2.3.x和2.4.x和2.5.x升级到2.5.12
   - 先按 4.1 把 PHP 升级到 **>= 8.3.36**（EL7 的 remi-php83 停在 8.3.8，必须迁移到 Rocky/RHEL 9 或 Ubuntu）
   - dnf install -y unzip
   - 替换代码后执行 `cd /var/www/html/server && php install.php`
   - 重启 `svnadmind` 与 Apache/php-fpm
-  - Docker 部署必须拉取 2.5.11 新镜像并重建容器，只 restart 旧容器不会生效（旧镜像是 CentOS 7 + mod_php）
+  - Docker 部署必须拉取 2.5.12 新镜像并重建容器，只 restart 旧容器不会生效（2.5.10 及更早的镜像是 CentOS 7 + mod_php）
   - 升级后检查 `/etc/httpd/conf.d/subversion.conf` 顶层是否有 `SVNUseUTF8 On`，没有的话中文仓库名无法通过 HTTP 检出（见 5.17）
   - Docker 部署如果沿用 `-v /data/svnadmin/conf.d/:/etc/httpd/conf.d/` 整目录挂载，需要把镜像内的 php-fpm 转发配置补进该目录，否则接口会直接返回 PHP 源码（见 5.16）
 
@@ -321,7 +324,7 @@ nohup php server/svnadmind.php start &
 - 创建数据库 svnadmin
 - 将安装包中的MySQL文件 templete/database/mysql/svnadmind.sql 导入数据库
 - 修改 config/database.php 将sqlite部分注释并配置你的MySQL即可
-- 注意：2.5.11 要求 PHP >= 8.3.36，已原生支持 MySQL 8 的认证方式；如仍遇到 `The server requested authentication method unknown to the client`，请确认 PHP 版本并检查 MySQL 用户认证插件
+- 注意：2.5.11 起要求 PHP >= 8.3.36，已原生支持 MySQL 8 的认证方式；如仍遇到 `The server requested authentication method unknown to the client`，请确认 PHP 版本并检查 MySQL 用户认证插件
 
 ##### 5.3 为什么只支持管理Subversion1.8+ ？
 
@@ -376,7 +379,7 @@ select * from admin_users;
   - Rocky/RHEL 9（remi）：`/etc/php-fpm.d/www.conf` 的 `[www]` 段
   - Ubuntu（ondrej PPA）：`/etc/php/8.3/fpm/pool.d/www.conf` 的 `[www]` 段
   - 修改后执行 `systemctl restart php-fpm`（Ubuntu 为 `php8.3-fpm`）
-- 2.5.11 的 Docker 镜像已内置 `request_terminate_timeout = 0`，使用官方镜像无需处理；如果自行挂载了 `www.conf`，需要自己补上该项
+- 2.5.11 及以后的 Docker 镜像已内置 `request_terminate_timeout = 0`，使用官方镜像无需处理；如果自行挂载了 `www.conf`，需要自己补上该项
 - 不需要修改 php.ini 的 `max_execution_time`：下载代码里已经调用 `set_time_limit(0)`，且该参数在 Linux 下只累计 CPU 时间，不包含阻塞 IO
 - 如果前面还有 nginx 反向代理，需要同时放宽 `proxy_read_timeout` / `fastcgi_read_timeout`
 
@@ -504,5 +507,5 @@ SVNUseUTF8 On
   ...
 </Location>
 修改后先执行 httpd -t 校验，再执行 httpd -k graceful 平滑重载
-2.5.11 起的 Apache 模板已自带该指令；旧配置可以在系统里切换一次「HTTP 检出」重新生成 subversion.conf
+2.5.12 起的 Apache 模板已自带该指令；此前的版本可以在系统里切换一次「HTTP 检出」重新生成 subversion.conf，或手工添加
 ```
