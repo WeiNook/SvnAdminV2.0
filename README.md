@@ -48,7 +48,7 @@ Subversion：1.8+（Docker 镜像内置 1.14）
 
 > 本仓库 CI 产出的完整 tag 形如 `2.5.12-php83-svn1.14`。下面示例中的 `witersencom/svnadmin:2.5.12` 请替换为你实际发布的镜像地址；如果没有 `2.5.12` 别名，请直接使用完整 tag。
 >
-> GitHub Actions 会把镜像推送到 GHCR：`ghcr.io/<仓库所有者>/svnadmin`，包含 `2.5.12`、`2.5.12-php83-svn1.14`、`sha-<短提交>`，默认分支额外推送 `latest`。PR 只构建并执行冒烟测试，不推送镜像。
+> GitHub Actions 会把镜像推送到 GHCR：`ghcr.io/<仓库所有者>/svnadmin`，包含 `2.5.12`、`2.5.12-php83-svn1.14`、`sha-<短提交>`，默认分支额外推送 `latest`。PR 和普通分支的自动 push 只构建并执行冒烟测试，不推送镜像；在 Actions 里手动 Run workflow 时可以选择任意分支构建并推送（同名版本 tag 会被覆盖）。
 
 此方式可快速部署程序体验效果，数据不存储在宿主机，生产环境使用请看3.2
 

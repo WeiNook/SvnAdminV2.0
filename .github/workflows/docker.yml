@@ -53,9 +53,15 @@ jobs:
           IMAGE="ghcr.io/${OWNER_LC}/svnadmin"
           PUSH_TAGS=""
 
-          # 只有默认分支和 tag 允许推送镜像；PR 和普通分支只构建 + 冒烟
+          # 推送规则：
+          # - 默认分支的 push、v* tag 允许推送镜像
+          # - 手动触发（workflow_dispatch）允许选择任意分支构建并推送，便于在分支上发布/验证
+          # - PR 和普通分支的自动 push 只构建 + 冒烟，不推送
+          # 注意：手动触发不同分支时，若 version.php 版本号相同会覆盖同名镜像 tag
           SHOULD_PUSH=false
-          if [ "${GITHUB_EVENT_NAME}" = "push" ] || [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            SHOULD_PUSH=true
+          elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
             if [ "${GITHUB_REF}" = "refs/heads/${DEFAULT_BRANCH}" ]; then
               SHOULD_PUSH=true
             fi
